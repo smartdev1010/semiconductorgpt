@@ -54,7 +54,7 @@ You have two answers to pick from as sources of insights .
 First optional answer is {answer1}.
 Second optional answer is {answer2}.
 
-If first optional answer is kind of 'I don't know' then just return second optional answer as final.
+If first optional answer is along the lines of 'I don't know' then just return second optional answer as final.
 If not, please combine & synthesize both the answers in a way that the context from both the answers is maintained and return the combined insights as the final answer."""
 
 llm_chain = LLMChain(llm=ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0, max_tokens=7500), prompt=PromptTemplate.from_template(prompt_template))
