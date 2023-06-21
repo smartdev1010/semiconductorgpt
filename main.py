@@ -15,7 +15,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # loader = PyPDFDirectoryLoader("./docs")
-# documents = loader.load_and_split(CharacterTextSplitter(chunk_size=1000, chunk_overlap=0))
+# documents = loader.load_and_split(CharacterTextSplitter(chunk_size=1000, chunk_overlap=256))
 
 # vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
 # vectorstore.save_local("./vector")
