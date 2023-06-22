@@ -2,3 +2,7 @@ beautifulsoup4
 numpy
 pandas
 streamlit
+langchain
+openai
+pypdf
+unstructured
