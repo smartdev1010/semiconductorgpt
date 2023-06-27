@@ -113,4 +113,4 @@ memory = ConversationBufferMemory(memory_key="chat_history")
 llm=OpenAI(temperature=0)
 agent_chain = initialize_agent(tools, llm, agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION, verbose=True, memory=memory)
 
-agent_chain.run("Compare Intel with its competitors financially.")
+agent_chain.run("Compare Intel with AMD financially.")

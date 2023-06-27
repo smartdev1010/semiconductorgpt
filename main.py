@@ -1,71 +1,154 @@
+from langchain.vectorstores import FAISS, Pinecone
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain, LLMChain
-from langchain.document_loaders import PyPDFDirectoryLoader
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
-from dotenv import load_dotenv
-import os
+from langchain.agents import initialize_agent, AgentType
+from langchain.tools import Tool
+from langchain.utilities import GoogleSearchAPIWrapper
+import asyncio
+import pinecone
 import openai
+import os
+from dotenv import load_dotenv
+
 
 load_dotenv()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+ans_chatgpt = ""
+ans_docqa = ""
+ans_googlegpt = ""
 
-# loader = PyPDFDirectoryLoader("./docs")
-# documents = loader.load_and_split(CharacterTextSplitter(chunk_size=1000, chunk_overlap=256))
 
-# vectorstore = FAISS.from_documents(documents, OpenAIEmbeddings())
-# vectorstore.save_local("./vector")
-vectorstore = FAISS.load_local("./vector", embeddings=OpenAIEmbeddings())
+async def chatgpt(query: str):
+    print("\nChatGPT answer\n")
+    print(
+        "\n=====================================================================================\n"
+    )
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    completion = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo-16k",
+        temperature=0,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a McKinsey partner who is known for his cutting edge insights. You are consulting a client who is going to give you a 100 million contract if you are insightful enough. You always give a so-what to the client when providing facts. You never give random answers that have no meaning and you are always focused on nuanced insights combining multiple legitimate sources of information. .",
+            },
+            {"role": "user", "content": query},
+        ],
+    )
+    ans_docqa = completion.choices[0].message.content
+    print(ans_docqa)
+    print("\nChatGPT answer completed\n")
+    print(
+        "\n=====================================================================================\n"
+    )
 
-query = "Give me a perspective on the Semiconductor industry. What is the future outlook of this industry? What are the drivers of this market? Tell me what capabilities does a player need to win in this market? Keep in mind the global interconnecting nature of the players and countries in this industry."
 
-qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0), vectorstore.as_retriever(), memory=ConversationBufferMemory(memory_key="chat_history", return_messages=True))
+index_name = "semiconduct-retrieval"
+pinecone.init(
+    api_key=os.getenv("PINECONE_API_KEY"), environment=os.getenv("PINECONE_ENV")
+)
 
-prompt_template = """You are You are a McKinsey partner who is known for his cutting edge insights. The stakes are high & you are consulting a client who is going to give you a 100 million contract if you are insightful enough. You always give a so-what to the client when providing facts. You never give random answers that have no meaning and you are always focused on nuanced insights combining multiple legitimate sources of information. 
 
-Question is {query}
-You have two answers to pick from as sources of insights .
-First optional answer is {answer1}.
-Second optional answer is {answer2}.
+async def docqa(query: str):
+    print("\nAnswer based on Docs\n")
+    print(
+        "\n=====================================================================================\n"
+    )
+    vectorstore = Pinecone.from_existing_index(
+        index_name=index_name, embedding=OpenAIEmbeddings()
+    )
+    # vectorstore = FAISS.load_local("./vector", embeddings=OpenAIEmbeddings())
+    qa = RetrievalQA.from_chain_type(
+        llm=ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0),
+        chain_type="stuff",
+        retriever=vectorstore.as_retriever(),
+        return_source_documents=True,
+    )
+    result = qa({"query": query})
+    ans_docqa = result["result"]
+    print(ans_docqa)
+    print(f"\nSOURCE ---------------->\n")
+    print(
+        "\n=====================================================================================\n"
+    )
+    for source_doc in result["source_documents"]:
+        print(source_doc.metadata["source"])
+    print(
+        "\n===================================================================================\n"
+    )
+    print("\nDocQA completed\n")
+    print(
+        "\n=====================================================================================\n"
+    )
 
-If first optional answer is along the lines of 'I don't know' then just return second optional answer as final.
-If not, please combine & synthesize both the answers in a way that the context from both the answers is maintained and return the combined insights as the final answer."""
 
-llm_chain = LLMChain(llm=ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0, max_tokens=7500), prompt=PromptTemplate.from_template(prompt_template))
+async def googlegpt(query):
+    print("\nGoogleGPT started\n")
+    print(
+        "\n=====================================================================================\n"
+    )
+    llm = ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0)
+    search = GoogleSearchAPIWrapper()
+    tools = [
+        Tool.from_function(
+            func=search.run,
+            name="Search",
+            description="useful for when you need to answer questions about current events",
+        )
+    ]
+    agent_chain = initialize_agent(
+        tools,
+        llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True,
+    )
+    ans_googlegpt = agent_chain.run(query)
+    print(ans_googlegpt)
+    print("\nGoogleGPT completed\n")
+    print(
+        "\n=====================================================================================\n"
+    )
 
-while True:
-  query = input("Input your query: ")
 
-  result = qa({"question": query})
-  answer1 = result["answer"]
+async def main(query: str):
+    tasks = [
+        asyncio.ensure_future(chatgpt(query)),
+        asyncio.ensure_future(docqa(query)),
+        asyncio.ensure_future(googlegpt(query)),
+    ]
+    await asyncio.gather(*tasks)
+    print("\nAll functions completed\n")
+    print(
+        "\n=====================================================================================\n"
+    )
 
-  print("\nAnswer based on Docs\n")
-  print("\n=====================================================================================\n")
-  print(answer1)
-  print("\n=====================================================================================\n")
 
-  completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo-16k",
-    messages=[
-      {"role": "system", "content": "You are a McKinsey partner who is known for his cutting edge insights. You are consulting a client who is going to give you a 100 million contract if you are insightful enough. You always give a so-what to the client when providing facts. You never give random answers that have no meaning and you are always focused on nuanced insights combining multiple legitimate sources of information. ."},
-      {"role": "user", "content": query}
-    ],
-    
-  )
-  answer2 = completion.choices[0].message.content
+if __name__ == "__main__":
+    while True:
+        query = input("Input your query: ")
 
-  print("\nChatGPT answer\n")
-  print("\n=====================================================================================\n")
-  print(answer2)
-  print("\n=====================================================================================\n")
-  
-  final = llm_chain.run(query=query, answer1=answer1, answer2=answer2)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main(query))
 
-  print("\Final answer\n")
-  print("\n=====================================================================================\n")
-  print(final)
-  print("\n=====================================================================================\n")
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
+            temperature=0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are You are a McKinsey partner who is known for his cutting edge insights. The stakes are high & you are consulting a client who is going to give you a 100 million contract if you are insightful enough. You always give a so-what to the client when providing facts. You never give random answers that have no meaning and you are always focused on nuanced insights combining multiple legitimate sources of information. DON'T mention you are combining several source of information in the answer.",
+                },
+                {
+                    "role": "user",
+                    "content": f"Question is {query}.\nYou have two answers to pick from as sources of insights .\nFirst optional answer is {ans_chatgpt}. \nSecond optional answer is {ans_docqa}.\nThird optional answer is {ans_googlegpt}\n\nPlease combine & synthesize all the answers in a way that the context from all the answers is maintained and return the combined insights as the final answer.",
+                },
+            ],
+        )
+        ans_final = completion.choices[0].message.content
+
+        print(ans_final)
+
+        print(
+            "\n=====================================================================================\n"
+        )
