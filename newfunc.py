@@ -19,18 +19,18 @@ def prepare_prompt(csv_string, prompt):
     return full_prompt
 
 
-def fetch_and_visualize_financial_data(keyword: str, timeframe: str):
+def fetch_and_visualize_financial_data(keyword: str, timeframe: str, company: str):
     """Fetch appropriate CSV files in the database related to the given keyword and generate a visualization of the data trends within the given timeframe. Parameters: keyword (str): The financial keyword (e.g., 'revenue', 'costs'). timeframe (str): The timeframe for the data trend (e.g., 'last 5 years'). Returns: dict: Visualization data"""  #
 
     # Read the xlsx file into a dataframe
-    df = pd.read_excel("./xlsxs/intc_financial_statement.xlsx")
+    # df = pd.read_excel("./xlsxs/intc_financial_statement.xlsx")
     # Convert all columns to strings
-    df = df.astype(str)
+    # df = df.astype(str)
     # Convert dataframe to string format
-    xlsx_string = df.to_csv(index=False, sep="\t")
+    # xlsx_string = df.to_csv(index=False, sep="\t")
 
     full_prompt = prepare_prompt(
-        xlsx_string,
+        "",
         f"Give me code in python to plot the analyze the {keyword} in the {timeframe}.",
     )
 
@@ -54,8 +54,12 @@ def fetch_and_visualize_financial_data(keyword: str, timeframe: str):
         response["choices"][0]["message"].content.split("Code starts here:")[-1].strip()
     )
     generated_code = generated_code.replace("python", "")
+    generated_code = generated_code.replace(
+        "data.xlsx", f"./xlsxs/{company}_financial_statement.xlsx"
+    )
+
     # Execute the generated code
-    exec(generated_code)
+    exec(generated_code.split("```")[1])
     # # Display the plot
     # plt.show()
 
@@ -75,13 +79,17 @@ functions = [
                     "type": "string",
                     "description": "Timeframe for the data trend, e.g., 'last 5 years'",
                 },
+                "company": {
+                    "type": "string",
+                    "description": "Company Token, e.g., 'amat', 'amd', 'asml', 'avgo', 'intc', 'lrcx', 'mu', 'nvda, 'qcom', 'ssnlf', 'tsm', 'txn'",
+                },
             },
             "required": ["keyword", "timeframe"],
         },
     }
 ]
 
-question = "Show me the revenue trend for the last 5 years."
+question = "Compare the top 5 semiconductor companies financially over the last 3 years"
 
 response = openai.ChatCompletion.create(
     model="gpt-3.5-turbo-16k",
@@ -104,23 +112,24 @@ if message.get("function_call"):
         function_response = fetch_and_visualize_financial_data(
             keyword=arguments.get("keyword"),
             timeframe=arguments.get("timeframe"),
+            company=arguments.get("company"),
         )
 
-    second_response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo-16k",
-        temperature=0,
-        messages=[
-            {"role": "user", "content": question},
-            message,
-            {
-                "role": "function",
-                "name": function_name,
-                "content": function_response,
-            },
-        ],
-    )
+    # second_response = openai.ChatCompletion.create(
+    #     model="gpt-3.5-turbo-16k",
+    #     temperature=0,
+    #     messages=[
+    #         {"role": "user", "content": question},
+    #         message,
+    #         {
+    #             "role": "function",
+    #             "name": function_name,
+    #             "content": function_response,
+    #         },
+    #     ],
+    # )
 
-    print(second_response.choices[0]["message"]["content"].strip())
+    # print(second_response.choices[0]["message"]["content"].strip())
 
-else:
-    print(response.choices[0]["message"]["content"].strip())
+# else:
+# print(response.choices[0]["message"]["content"].strip())
