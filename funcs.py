@@ -2,11 +2,12 @@ import openai
 from dotenv import load_dotenv
 import os
 import pinecone
-from langchain.vectorstores import Pinecone
+from langchain.vectorstores import Pinecone, FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from langchain.utilities import GoogleSearchAPIWrapper
+from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
 
@@ -40,7 +41,7 @@ def chatgpt(query: str):
     return ans_docqa
 
 
-index_name = "semiconduct-retrieval"
+index_name = "semiconduct-retrieval2"
 pinecone.init(
     api_key=os.getenv("PINECONE_API_KEY"), environment=os.getenv("PINECONE_ENV")
 )
@@ -55,11 +56,26 @@ def docqa(query: str):
         index_name=index_name, embedding=OpenAIEmbeddings()
     )
     # vectorstore = FAISS.load_local("./vector", embeddings=OpenAIEmbeddings())
+
+    prompt_template = """Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+{context}
+
+Question: {question}
+Try to make answer as long as you can:"""
+
+    PROMPT = PromptTemplate(
+        template=prompt_template, input_variables=["context", "question"]
+    )
+
+    chain_type_kwargs = {"prompt": PROMPT}
+
     qa = RetrievalQA.from_chain_type(
-        llm=ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0),
+        llm=ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0, max_tokens=12000),
         chain_type="stuff",
         retriever=vectorstore.as_retriever(),
         return_source_documents=True,
+        chain_type_kwargs=chain_type_kwargs
     )
     result = qa({"query": query})
     ans_docqa = result["result"]

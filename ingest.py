@@ -1,7 +1,7 @@
 import tiktoken
 from langchain.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Pinecone
+from langchain.vectorstores import Pinecone, FAISS
 from langchain.embeddings import OpenAIEmbeddings
 import pinecone
 import os
@@ -20,12 +20,20 @@ def tiktoken_len(text):
 
 loader = PyPDFDirectoryLoader("./docs")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=400,
-    chunk_overlap=20,
+    chunk_size=3000,
+    chunk_overlap=500,
     length_function=tiktoken_len,
     separators=["\n\n", "\n", " ", ""],
 )
 docs = loader.load_and_split(text_splitter)
+
+# if os.path.exists("./vector/index.faiss"):
+#     db = FAISS.load_local("./vector", OpenAIEmbeddings())
+#     db.add_documents(docs)
+# else:
+#     db = FAISS.from_documents(docs, OpenAIEmbeddings())
+#     db.save_local("./vector")
+
 
 index_name = "semiconduct-retrieval"
 pinecone.init(
@@ -33,8 +41,8 @@ pinecone.init(
 )
 print(pinecone.list_indexes())
 
-# if index_name in pinecone.list_indexes():
-#     pinecone.delete_index(name=index_name)
+if index_name in pinecone.list_indexes():
+    pinecone.delete_index(name=index_name)
 
 if index_name not in pinecone.list_indexes():
     # we create a new index

@@ -108,7 +108,7 @@ if prompt := st.chat_input():
                 },
                 {
                     "role": "user",
-                    "content": f"Following is analyzed financial information.\n\n {anaylze} \n\n Give me python code that visualize above information by using matplotlib library. Only return code.",
+                    "content": f"Following is analyzed financial information.\n\n {anaylze} \n\n Give me python code that visualize above information by using matplotlib library with awesome and beautiful styles, colors and . Only return code.",
                 },
             ],
         )

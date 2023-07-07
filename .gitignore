@@ -1,2 +1,6 @@
 docs
 venv
+.vscode
+__pycache__
+.env
+.streamlit
